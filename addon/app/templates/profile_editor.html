@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Profil — {{ device.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">{{ device.name }}</h1>
+    <div class="page-sub">{{ device.ip }}:{{ device.port }} · <span class="badge-{{ device.type }}">{{ device.type | upper }}</span></div>
+  </div>
+  <div class="header-actions">
+    <a href="/" class="btn btn-secondary">← Dashboard</a>
+    <button class="btn btn-primary" onclick="saveAll()">💾 Speichern</button>
+  </div>
+</div>
+
+<div id="entity-list">
+  {% if not profile.entities %}
+  <div class="empty-state" id="empty-hint">
+    <div class="empty-icon">⊙</div>
+    <p>Noch keine Entities. Füge unten welche hinzu.</p>
+  </div>
+  {% endif %}
+  {% for entity in profile.entities %}
+  <div class="entity-row" data-id="{{ entity.id }}" data-type="{{ entity.type }}">
+    <div class="entity-type-pill pill-{{ entity.type }}">{{ entity.type }}</div>
+    <div class="entity-fields">
+      <input class="form-input entity-name" type="text" value="{{ entity.name }}" placeholder="Name">
+      <input class="form-input entity-osc mono" type="text" value="{{ entity.osc_path }}" placeholder="/osc/pfad" list="osc-suggestions">
+    </div>
+    <div class="entity-meta">
+      {% if entity.type == 'number' %}
+      <span class="meta-chip">{{ entity.min }} – {{ entity.max }}</span>
+      {% elif entity.type == 'switch' %}
+      <span class="meta-chip">on={{ entity.on_value }} off={{ entity.off_value }}</span>
+      {% endif %}
+    </div>
+    <button class="btn btn-sm btn-danger entity-delete" onclick="deleteEntity('{{ device.id }}', '{{ entity.id }}', this)">✕</button>
+  </div>
+  {% endfor %}
+</div>
+
+<datalist id="osc-suggestions">
+  {% for s in suggestions %}
+  <option value="{{ s }}">
+  {% endfor %}
+</datalist>
+
+<div class="add-entity-section">
+  <h3 class="section-title">Entity hinzufügen</h3>
+  <div class="form-card">
+    <div class="form-row">
+      <div class="form-group flex-1">
+        <label class="form-label">Typ</label>
+        <select class="form-input" id="new-type" onchange="updateNewForm()">
+          <option value="number">number</option>
+          <option value="switch">switch</option>
+          <option value="button">button</option>
+        </select>
+      </div>
+      <div class="form-group flex-2">
+        <label class="form-label">Name</label>
+        <input class="form-input" id="new-name" type="text" placeholder="z.B. Master Fader">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">OSC-Pfad</label>
+      <input class="form-input mono" id="new-osc" type="text" placeholder="{{ suggestions[0] if suggestions else '/control/1' }}" list="osc-suggestions">
+    </div>
+
+    <div id="extra-number" class="form-row">
+      <div class="form-group flex-1">
+        <label class="form-label">Min</label>
+        <input class="form-input mono" id="new-min" type="number" value="0">
+      </div>
+      <div class="form-group flex-1">
+        <label class="form-label">Max</label>
+        <input class="form-input mono" id="new-max" type="number" value="255">
+      </div>
+    </div>
+
+    <div id="extra-switch" class="form-row hidden">
+      <div class="form-group flex-1">
+        <label class="form-label">On-Wert</label>
+        <input class="form-input mono" id="new-on" type="text" value="1">
+      </div>
+      <div class="form-group flex-1">
+        <label class="form-label">Off-Wert</label>
+        <input class="form-input mono" id="new-off" type="text" value="0">
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="addEntity('{{ device.id }}')">
+      ＋ Entity hinzufügen
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const deviceId = '{{ device.id }}';
+
+function updateNewForm() {
+  const t = document.getElementById('new-type').value;
+  document.getElementById('extra-number').classList.toggle('hidden', t !== 'number');
+  document.getElementById('extra-switch').classList.toggle('hidden', t !== 'switch');
+}
+
+async function saveAll() {
+  const rows = document.querySelectorAll('.entity-row');
+  const entities = [];
+  rows.forEach(row => {
+    const e = {
+      id: row.dataset.id,
+      type: row.dataset.type,
+      name: row.querySelector('.entity-name').value,
+      osc_path: row.querySelector('.entity-osc').value,
+    };
+    // Bestehende Metadaten erhalten (min/max etc.) — wir senden den ganzen Profile-Block
+    entities.push(e);
+  });
+
+  const profile = {
+    name: '{{ profile.name }}',
+    device_type: '{{ device.type }}',
+    version: '1.0',
+    entities,
+  };
+
+  const r = await fetch(`/api/device/${deviceId}/profile`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(profile),
+  });
+  const d = await r.json();
+  showToast(d.ok ? 'Gespeichert ✓' : 'Fehler beim Speichern', d.ok ? 'ok' : 'error');
+}
+
+async function addEntity(deviceId) {
+  const type = document.getElementById('new-type').value;
+  const payload = {
+    name: document.getElementById('new-name').value.trim(),
+    type,
+    osc_path: document.getElementById('new-osc').value.trim(),
+    min: parseFloat(document.getElementById('new-min').value),
+    max: parseFloat(document.getElementById('new-max').value),
+    on_value: document.getElementById('new-on').value,
+    off_value: document.getElementById('new-off').value,
+  };
+  if (!payload.name || !payload.osc_path) {
+    showToast('Name und OSC-Pfad sind Pflichtfelder', 'error'); return;
+  }
+  const r = await fetch(`/api/device/${deviceId}/entity/add`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const d = await r.json();
+  if (d.ok) { location.reload(); }
+  else { showToast('Fehler: ' + d.message, 'error'); }
+}
+
+async function deleteEntity(deviceId, entityId, btn) {
+  if (!confirm('Entity löschen?')) return;
+  const r = await fetch(`/api/device/${deviceId}/entity/${entityId}/delete`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) { btn.closest('.entity-row').remove(); showToast('Gelöscht', 'ok'); }
+}
+</script>
+{% endblock %}

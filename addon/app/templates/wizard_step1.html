@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Gerät hinzufügen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Gerät hinzufügen</h1>
+</div>
+
+<div class="wizard-steps">
+  <div class="wizard-step active">1 Typ</div>
+  <div class="wizard-step-sep">›</div>
+  <div class="wizard-step">2 Verbindung</div>
+  <div class="wizard-step-sep">›</div>
+  <div class="wizard-step">3 Profil</div>
+</div>
+
+<h2 class="wizard-subtitle">Welchen Gerätetyp möchtest du hinzufügen?</h2>
+
+<div class="device-type-grid">
+
+  <a href="/add/step2?type=qlcplus" class="type-tile">
+    <div class="type-icon">💡</div>
+    <div class="type-name">QLC+</div>
+    <div class="type-desc">Lichtsteuerung</div>
+  </a>
+
+  <a href="/add/step2?type=x32" class="type-tile">
+    <div class="type-icon">🎚</div>
+    <div class="type-name">Behringer X32</div>
+    <div class="type-desc">Digitalpult</div>
+  </a>
+
+  <a href="/add/step2?type=m32" class="type-tile">
+    <div class="type-icon">🎛</div>
+    <div class="type-name">Midas M32</div>
+    <div class="type-desc">Digitalpult</div>
+  </a>
+
+  <a href="/add/step2?type=yamaha_ql" class="type-tile">
+    <div class="type-icon">🔊</div>
+    <div class="type-name">Yamaha QL</div>
+    <div class="type-desc">Digitalpult</div>
+  </a>
+
+  <a href="/add/step2?type=generic" class="type-tile">
+    <div class="type-icon">⊙</div>
+    <div class="type-name">Generisch</div>
+    <div class="type-desc">OSC-Gerät</div>
+  </a>
+
+</div>
+{% endblock %}

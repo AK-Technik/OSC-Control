@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}OSC Monitor{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">OSC Monitor</h1>
+  <div class="header-actions">
+    <button class="btn btn-secondary" id="btn-pause" onclick="togglePause()">⏸ Pause</button>
+    <button class="btn btn-secondary" onclick="clearLog()">✕ Leeren</button>
+  </div>
+</div>
+
+<div class="monitor-filters">
+  <select class="form-input filter-select" id="filter-device" onchange="reconnectSSE()">
+    <option value="">Alle Geräte</option>
+    {% for d in devices %}
+    <option value="{{ d.id }}">{{ d.name }}</option>
+    {% endfor %}
+  </select>
+  <input class="form-input filter-path mono" id="filter-path" type="text" placeholder="/pfad/filter" oninput="filterPath(this.value)">
+</div>
+
+<div class="monitor-split">
+  <div class="monitor-col">
+    <div class="monitor-col-header out">↑ AUSGEHEND</div>
+    <div class="monitor-log" id="log-out"></div>
+  </div>
+  <div class="monitor-col">
+    <div class="monitor-col-header in">↓ EINGEHEND</div>
+    <div class="monitor-log" id="log-in"></div>
+  </div>
+</div>
+
+<div class="send-console">
+  <h3 class="section-title">OSC Senden</h3>
+  <div class="form-row">
+    <div class="form-group flex-1">
+      <select class="form-input" id="send-device">
+        {% for d in devices %}
+        <option value="{{ d.id }}">{{ d.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group flex-2">
+      <input class="form-input mono" id="send-path" type="text" placeholder="/osc/pfad" list="send-suggestions">
+      <datalist id="send-suggestions">
+        <option value="/qlc/function/run">
+        <option value="/qlc/function/stop">
+        <option value="/ch/01/mix/fader">
+        <option value="/main/st/mix/fader">
+      </datalist>
+    </div>
+    <div class="form-group flex-1">
+      <input class="form-input mono" id="send-value" type="text" placeholder="Wert">
+    </div>
+    <button class="btn btn-primary" onclick="sendOSC()">Senden ⚡</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let evtSource = null;
+let paused = false;
+let pathFilter = '';
+
+function connectSSE() {
+  if (evtSource) evtSource.close();
+  const device = document.getElementById('filter-device').value;
+  let url = '/api/osc/stream';
+  if (device) url += `?device=${encodeURIComponent(device)}`;
+  evtSource = new EventSource(url);
+  evtSource.onmessage = e => {
+    const data = JSON.parse(e.data);
+    if (data.ping) return;
+    if (!paused) appendEvent(data);
+  };
+}
+
+function reconnectSSE() { connectSSE(); }
+
+function appendEvent(ev) {
+  if (pathFilter && !ev.path.toLowerCase().includes(pathFilter)) return;
+
+  const logId = ev.direction === 'out' ? 'log-out' : 'log-in';
+  const log = document.getElementById(logId);
+
+  const row = document.createElement('div');
+  row.className = `log-row status-${ev.status}`;
+  row.innerHTML = `
+    <span class="log-ts">${ev.ts}</span>
+    <span class="log-device">${ev.device}</span>
+    <span class="log-path">${ev.path}</span>
+    <span class="log-value">${ev.value}</span>
+  `;
+  log.insertBefore(row, log.firstChild);
+
+  // Max 200 Zeilen
+  while (log.children.length > 200) log.removeChild(log.lastChild);
+}
+
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('btn-pause');
+  btn.textContent = paused ? '▶ Fortsetzen' : '⏸ Pause';
+  btn.classList.toggle('btn-warning', paused);
+}
+
+function clearLog() {
+  document.getElementById('log-out').innerHTML = '';
+  document.getElementById('log-in').innerHTML = '';
+}
+
+function filterPath(val) { pathFilter = val.toLowerCase(); }
+
+async function sendOSC() {
+  const device_id = document.getElementById('send-device').value;
+  const path = document.getElementById('send-path').value.trim();
+  const value = document.getElementById('send-value').value.trim();
+  if (!path) { showToast('Pfad eingeben', 'error'); return; }
+
+  const r = await fetch('/api/osc/send', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({device_id, path, value}),
+  });
+  const d = await r.json();
+  showToast(d.ok ? `Gesendet: ${path}` : d.message, d.ok ? 'ok' : 'error');
+}
+
+connectSSE();
+</script>
+{% endblock %}

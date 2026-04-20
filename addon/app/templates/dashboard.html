@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Dashboard</h1>
+  <button class="btn btn-secondary" onclick="reloadIntegration()">
+    <span>↺</span> HA Reload
+  </button>
+</div>
+
+{% if not devices %}
+<div class="empty-state">
+  <div class="empty-icon">⊡</div>
+  <h2>Keine Geräte konfiguriert</h2>
+  <p>Füge dein erstes Gerät hinzu um zu starten.</p>
+  <a href="/add" class="btn btn-primary btn-large">＋ Gerät hinzufügen</a>
+</div>
+{% else %}
+<div class="device-grid">
+  {% for device in devices %}
+  <div class="device-card" data-id="{{ device.id }}">
+    <div class="device-card-header">
+      <div class="device-type-badge badge-{{ device.type }}">
+        {{ device.type | upper }}
+      </div>
+      <div class="status-dot status-{{ device.status }}" title="{{ device.status }}"></div>
+    </div>
+
+    <div class="device-name">{{ device.name }}</div>
+    <div class="device-addr">{{ device.ip }}:{{ device.port }}</div>
+
+    <div class="packet-stats">
+      <span class="stat out">↑ {{ device.packets_out }}</span>
+      <span class="stat in">↓ {{ device.packets_in }}</span>
+    </div>
+
+    <div class="device-actions">
+      <button class="btn btn-sm btn-secondary" onclick="testDevice('{{ device.id }}', this)">
+        Verbindung testen
+      </button>
+      <a href="/device/{{ device.id }}/profile" class="btn btn-sm btn-primary">
+        Profil editieren
+      </a>
+      <button class="btn btn-sm btn-danger" onclick="deleteDevice('{{ device.id }}', '{{ device.name }}')">
+        ✕
+      </button>
+    </div>
+
+    <div class="test-result" id="test-{{ device.id }}"></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="dashboard-footer">
+  <a href="/add" class="btn btn-primary btn-large">＋ Gerät hinzufügen</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function reloadIntegration() {
+  const btn = event.target.closest('button');
+  btn.disabled = true;
+  btn.textContent = '↺ Lädt...';
+  const r = await fetch('/api/reload', {method:'POST'});
+  const d = await r.json();
+  showToast(d.message, d.ok ? 'ok' : 'error');
+  btn.disabled = false;
+  btn.innerHTML = '<span>↺</span> HA Reload';
+}
+
+async function testDevice(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Teste...';
+  const r = await fetch(`/api/device/${id}/test`);
+  const d = await r.json();
+  const el = document.getElementById(`test-${id}`);
+  el.textContent = d.message;
+  el.className = `test-result ${d.ok ? 'ok' : 'error'}`;
+  btn.disabled = false;
+  btn.textContent = 'Verbindung testen';
+}
+
+async function deleteDevice(id, name) {
+  if (!confirm(`Gerät "${name}" wirklich löschen?`)) return;
+  const r = await fetch(`/api/device/${id}/delete`, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) { location.reload(); }
+}
+</script>
+{% endblock %}

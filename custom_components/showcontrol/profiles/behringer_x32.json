@@ -1,0 +1,240 @@
+{
+  "name": "Behringer X32",
+  "device": {
+    "id": "behringer_x32",
+    "name": "Behringer X32",
+    "manufacturer": "Behringer",
+    "model": "X32 / X32 Compact / X32 Rack",
+    "firmware_tested": "4.06",
+    "notes": "OSC/UDP on port 10023. Requires /xremote subscription renewal every <10s — use keepalive. Mute semantics are inverted: OSC value 1 = ON (unmuted), 0 = muted. Use bool_inverted on mute entities if you want HA 'on' to mean 'muted'. Source port must be fixed (not ephemeral) so X32 can return feedback to the same port."
+  },
+  "transport": {
+    "type": "osc_udp",
+    "default_port": 10023,
+    "source_port": 10024
+  },
+  "keepalive": {
+    "path": "/xremote",
+    "interval": 8.0,
+    "comment": "X32 drops subscription after 10s of silence. Send /xremote every 8s to keep feedback flowing."
+  },
+  "workarounds": [
+    {
+      "id": "xremote_timeout",
+      "description": "X32 /xremote subscription expires after ~10 seconds. The coordinator must send /xremote (no args) on a fixed interval < 10s."
+    },
+    {
+      "id": "fixed_source_port",
+      "description": "X32 sends feedback to the source address/port of the last /xremote. Bind the local socket to a fixed port (e.g. 10024) so feedback always arrives at the same place."
+    },
+    {
+      "id": "bool_inverted_mutes",
+      "description": "X32 mute OSC: 1 = channel ON (unmuted), 0 = muted. Set bool_inverted: true on mute entities so HA 'on' means 'muted' (intuitive for a mute button)."
+    },
+    {
+      "id": "fader_float",
+      "description": "Fader values are 0.0–1.0 float, NOT dB. 0.75 ≈ 0 dBFS (unity). Use value_type: float and set max: 1.0."
+    }
+  ],
+  "entity_templates": [
+    {
+      "comment": "=== CHANNEL FADERS (ch 01-32) ==="
+    },
+    {
+      "range": {
+        "var": "ch",
+        "from": 1,
+        "to": 32,
+        "pad": 2
+      },
+      "unique_id": "ch{ch}_fader",
+      "name": "Ch {ch} Fader",
+      "platform": "number",
+      "osc_path": "/ch/{ch}/mix/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "comment": "=== CHANNEL MUTES (ch 01-32) ==="
+    },
+    {
+      "range": {
+        "var": "ch",
+        "from": 1,
+        "to": 32,
+        "pad": 2
+      },
+      "unique_id": "ch{ch}_mute",
+      "name": "Ch {ch} Mute",
+      "platform": "switch",
+      "osc_path": "/ch/{ch}/mix/on",
+      "value_on": 1,
+      "value_off": 0,
+      "value_type": "int",
+      "bool_inverted": true,
+      "comment": "bool_inverted: X32 'on'=1 means unmuted; HA switch 'on' = muted"
+    },
+    {
+      "comment": "=== AUX FADERS (aux 01-08) ==="
+    },
+    {
+      "range": {
+        "var": "n",
+        "from": 1,
+        "to": 8,
+        "pad": 2
+      },
+      "unique_id": "aux{n}_fader",
+      "name": "Aux {n} Fader",
+      "platform": "number",
+      "osc_path": "/auxin/{n}/mix/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "comment": "=== BUS FADERS (bus 01-16) ==="
+    },
+    {
+      "range": {
+        "var": "n",
+        "from": 1,
+        "to": 16,
+        "pad": 2
+      },
+      "unique_id": "bus{n}_fader",
+      "name": "Bus {n} Fader",
+      "platform": "number",
+      "osc_path": "/bus/{n}/mix/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "comment": "=== MATRIX FADERS (mtx 01-06) ==="
+    },
+    {
+      "range": {
+        "var": "n",
+        "from": 1,
+        "to": 6,
+        "pad": 2
+      },
+      "unique_id": "mtx{n}_fader",
+      "name": "Matrix {n} Fader",
+      "platform": "number",
+      "osc_path": "/mtx/{n}/mix/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "comment": "=== DCA FADERS (dca 1-8) ==="
+    },
+    {
+      "range": {
+        "var": "n",
+        "from": 1,
+        "to": 8,
+        "pad": 1
+      },
+      "unique_id": "dca{n}_fader",
+      "name": "DCA {n} Fader",
+      "platform": "number",
+      "osc_path": "/dca/{n}/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "comment": "=== MAIN LR + MONO ==="
+    },
+    {
+      "unique_id": "main_lr_fader",
+      "name": "Main LR Fader",
+      "platform": "number",
+      "osc_path": "/main/st/mix/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "unique_id": "main_mono_fader",
+      "name": "Main Mono Fader",
+      "platform": "number",
+      "osc_path": "/main/m/mix/fader",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "value_type": "float"
+    },
+    {
+      "comment": "=== SCENE RECALLS (scenes 00-19, mapped to buttons 1-20) ==="
+    },
+    {
+      "range": {
+        "var": "n",
+        "from": 0,
+        "to": 19,
+        "pad": 0
+      },
+      "unique_id": "scene_recall_{n}",
+      "name": "Scene Recall {n}",
+      "platform": "button",
+      "osc_path": "/-action/goscene",
+      "osc_args": [
+        {
+          "type": "int",
+          "value": "{n}"
+        }
+      ],
+      "value_type": "int"
+    },
+    {
+      "comment": "=== MUTE GROUPS (mgrp 1-6) ==="
+    },
+    {
+      "range": {
+        "var": "n",
+        "from": 1,
+        "to": 6,
+        "pad": 1
+      },
+      "unique_id": "mgrp{n}",
+      "name": "Mute Group {n}",
+      "platform": "switch",
+      "osc_path": "/-stat/mute/{n}",
+      "value_on": 1,
+      "value_off": 0,
+      "value_type": "int"
+    },
+    {
+      "comment": "=== TAP TEMPO ==="
+    },
+    {
+      "unique_id": "tap_tempo",
+      "name": "Tap Tempo",
+      "platform": "button",
+      "osc_path": "/-action/tapbeat",
+      "osc_args": [
+        {
+          "type": "int",
+          "value": 1
+        }
+      ],
+      "value_type": "int"
+    }
+  ],
+  "feedback": {
+    "enabled": true,
+    "listen_port": 10024,
+    "comment": "X32 sends feedback to the source address/port of /xremote. Bind listener to source_port above."
+  }
+}
