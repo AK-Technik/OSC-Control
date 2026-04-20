@@ -1,0 +1,83 @@
+send:
+  name: Send OSC Message
+  description: >
+    Send an arbitrary OSC message to one or all configured Show Control devices.
+    Useful for automations, scripts, and custom control.
+  fields:
+    address:
+      name: OSC Address
+      description: "OSC address string, e.g. /ch/01/mix/fader"
+      required: true
+      example: "/ch/01/mix/fader"
+      selector:
+        text:
+    args:
+      name: Arguments
+      description: "List of OSC arguments (float, int, or string). Omit for no-arg messages."
+      required: false
+      example: "[0.75]"
+      selector:
+        object:
+    port:
+      name: Port Override
+      description: "Send to a different port than the device default (e.g. for multi-instance QLC+)."
+      required: false
+      example: 7701
+      selector:
+        number:
+          min: 1
+          max: 65535
+          mode: box
+    entry_id:
+      name: Device (Entry ID)
+      description: "Config entry ID of the target device. Omit to send to all Show Control devices."
+      required: false
+      selector:
+        text:
+
+keepalive_reset:
+  name: Reset Keepalive
+  description: >
+    Force-restart the keepalive loop for a device (e.g. after a network interruption).
+    Only relevant for devices with a keepalive configured (Behringer X32/XR series).
+  fields:
+    entry_id:
+      name: Device (Entry ID)
+      description: "Config entry ID of the target device. Omit to reset all."
+      required: false
+      selector:
+        text:
+
+request:
+  name: Request OSC Value
+  description: >
+    Send an OSC message to request a value from the device. The device response
+    will arrive via the feedback listener and update the relevant entity state automatically.
+    Example: send /ch/01/mix/fader with no args to request the current fader position from X32.
+  fields:
+    address:
+      name: OSC Address
+      description: "OSC address to request, e.g. /ch/01/mix/fader"
+      required: true
+      example: "/ch/01/mix/fader"
+      selector:
+        text:
+    args:
+      name: Arguments
+      description: "Optional arguments (usually empty for a request)."
+      required: false
+      selector:
+        object:
+    port:
+      name: Port Override
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          mode: box
+    entry_id:
+      name: Device (Entry ID)
+      required: false
+      selector:
+        text:

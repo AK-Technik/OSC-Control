@@ -22,10 +22,8 @@ class OscUdpTransport(AbstractTransport):
         self._default_port = port
         self._source_port = source_port
         self._clients: dict[int, SimpleUDPClient] = {}
-        self._feedback_server: AsyncIOOSCUDPServer | None = None
         self._feedback_transport = None
         self._feedback_protocol = None
-        self._feedback_task: asyncio.Task | None = None
 
     def _get_client(self, port: int) -> SimpleUDPClient:
         if port not in self._clients:
@@ -39,12 +37,8 @@ class OscUdpTransport(AbstractTransport):
         client = self._get_client(target_port)
         try:
             _LOGGER.debug("OSC send %s %s → %s:%d", address, args, self._host, target_port)
-            # python-osc send is blocking but fast (UDP)
-            loop = asyncio.get_event_loop()
-            if args:
-                await loop.run_in_executor(None, client.send_message, address, args)
-            else:
-                await loop.run_in_executor(None, client.send_message, address, [])
+            loop = asyncio.get_running_loop()  # FIX: was get_event_loop() — deprecated
+            await loop.run_in_executor(None, client.send_message, address, args if args else [])
         except Exception as exc:
             _LOGGER.warning("OSC send failed (%s %s): %s", address, args, exc)
 
@@ -53,19 +47,22 @@ class OscUdpTransport(AbstractTransport):
         listen_port: int,
         callback: Callable[[str, list[Any]], None],
     ) -> None:
-        """Start an asyncio OSC UDP server for feedback."""
+        """Start an asyncio OSC UDP server for inbound feedback."""
         dispatcher = Dispatcher()
         dispatcher.set_default_handler(
             lambda address, *args: callback(address, list(args))
         )
         try:
-            server = AsyncIOOSCUDPServer(
-                ("0.0.0.0", listen_port), dispatcher, asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()  # FIX: was get_event_loop()
+            server = AsyncIOOSCUDPServer(("0.0.0.0", listen_port), dispatcher, loop)
+            self._feedback_transport, self._feedback_protocol = (
+                await server.create_serve_endpoint()
             )
-            self._feedback_transport, self._feedback_protocol = await server.create_serve_endpoint()
             _LOGGER.info("OSC feedback listener started on port %d", listen_port)
         except Exception as exc:
-            _LOGGER.warning("Could not start OSC feedback listener on port %d: %s", listen_port, exc)
+            _LOGGER.warning(
+                "Could not start OSC feedback listener on port %d: %s", listen_port, exc
+            )
 
     async def stop_feedback_listener(self) -> None:
         if self._feedback_transport is not None:
@@ -82,12 +79,20 @@ class OscUdpTransport(AbstractTransport):
         _LOGGER.debug("OscUdpTransport closed")
 
     async def ping(self) -> bool:
-        """
-        OSC/UDP is connectionless. We attempt a send and consider it OK
-        if no socket error is raised. For X32, caller should use /xinfo.
-        """
+        """UDP is connectionless — we do a socket reachability check instead of blind send."""
         try:
-            await self.send("/ping", [])
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._check_socket)
             return True
         except Exception:  # noqa: BLE001
             return False
+
+    def _check_socket(self) -> None:
+        """Open a UDP socket and attempt a send; raises on hard network errors."""
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(2.0)
+        try:
+            sock.connect((self._host, self._default_port))
+        finally:
+            sock.close()

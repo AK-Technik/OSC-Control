@@ -1,4 +1,4 @@
-"""Show Control switch entities (mute, on/off, color buttons)."""
+"""Show Control switch entities (mute, on/off)."""
 from __future__ import annotations
 
 import logging
@@ -55,20 +55,10 @@ class ShowControlSwitch(SwitchEntity, RestoreEntity):
         self._osc_address = config.get("osc_address", "")
         self._port_override = config.get("port")
         self._bool_inverted = config.get("bool_inverted", False)
-        self._attr_icon = config.get("icon")
+        self._on_args: list[Any] = config.get("on_args", [1])
+        self._off_args: list[Any] = config.get("off_args", [0])
         self._attr_is_on: bool = False
-
-        # value_type determines how we send: "int" or "float"
-        self._value_type = config.get("value_type", "int")
-
-        # on/off values from profile (default 255/0 for QLC+, 1/0 for X32)
-        self._value_on = config.get("value_on", 1)
-        self._value_off = config.get("value_off", 0)
-
-    def _make_args(self, raw_value: Any) -> list[Any]:
-        if self._value_type == "float":
-            return [float(raw_value)]
-        return [int(raw_value)]
+        self._attr_icon = config.get("icon")
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -113,19 +103,15 @@ class ShowControlSwitch(SwitchEntity, RestoreEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         self._attr_is_on = True
-        # bool_inverted: HA "on" = muted = send value_off to device
-        raw = self._value_off if self._bool_inverted else self._value_on
-        await self._coordinator.async_send(
-            self._osc_address, self._make_args(raw), port=self._port_override
-        )
-        self._coordinator.set_cached_state(self._attr_unique_id, raw)
+        # bool_inverted: "on" in HA = muted = send 1 (mute on)
+        args = self._off_args if self._bool_inverted else self._on_args
+        await self._coordinator.async_send(self._osc_address, args, port=self._port_override)
+        self._coordinator.set_cached_state(self._attr_unique_id, 1 if not self._bool_inverted else 0)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         self._attr_is_on = False
-        raw = self._value_on if self._bool_inverted else self._value_off
-        await self._coordinator.async_send(
-            self._osc_address, self._make_args(raw), port=self._port_override
-        )
-        self._coordinator.set_cached_state(self._attr_unique_id, raw)
+        args = self._on_args if self._bool_inverted else self._off_args
+        await self._coordinator.async_send(self._osc_address, args, port=self._port_override)
+        self._coordinator.set_cached_state(self._attr_unique_id, 0 if not self._bool_inverted else 1)
         self.async_write_ha_state()

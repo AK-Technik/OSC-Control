@@ -12,6 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 REQUIRED_PROFILE_KEYS = {"name", "device", "transport"}
 VALID_PLATFORMS = {"number", "switch", "button", "select"}
 VALID_TRANSPORTS = {"osc_udp"}
+VALID_OSC_ARG_TEMPLATES = {"float", "int", "scaled_255"}
 
 
 class ProfileError(Exception):
@@ -30,14 +31,14 @@ def list_builtin_profiles(profiles_dir: str) -> dict[str, str]:
                 with open(full_path, encoding="utf-8") as f:
                     data = json.load(f)
                 display = data.get("name", fname.removesuffix(".json"))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 display = fname.removesuffix(".json")
             result[display] = full_path
     return result
 
 
 def load_profile(path_or_content: str, *, is_content: bool = False) -> dict[str, Any]:
-    """Load, validate and expand a profile. Returns expanded profile dict."""
+    """Load and validate a profile. Returns expanded profile dict."""
     if is_content:
         raw = json.loads(path_or_content)
     else:
@@ -45,13 +46,11 @@ def load_profile(path_or_content: str, *, is_content: bool = False) -> dict[str,
             raw = json.load(f)
 
     _validate(raw)
-    expanded = _expand_entities(raw)
-    # Normalize all entities: osc_path -> osc_address
-    expanded["entities"] = [normalize_entity(e) for e in expanded.get("entities", [])]
-    return expanded
+    return _expand_entities(raw)
 
 
 def _validate(profile: dict) -> None:
+    """Validate profile structure and all entity/template definitions."""
     missing = REQUIRED_PROFILE_KEYS - set(profile.keys())
     if missing:
         raise ProfileError(f"Profile missing required keys: {missing}")
@@ -59,48 +58,63 @@ def _validate(profile: dict) -> None:
     transport = profile.get("transport", {})
     t_type = transport.get("type")
     if t_type not in VALID_TRANSPORTS:
-        raise ProfileError(f"Unsupported transport type: {t_type!r}. Valid: {VALID_TRANSPORTS}")
+        raise ProfileError(
+            f"Unsupported transport type: {t_type!r}. Valid: {VALID_TRANSPORTS}"
+        )
 
     entities = profile.get("entities", [])
-    entity_templates = profile.get("entity_templates", [])
+    templates = profile.get("entity_templates", [])
 
-    # Comment-only entries (no platform) are allowed and silently ignored
-    real_entities = [e for e in entities if e.get("platform")]
-    real_templates = [e for e in entity_templates if e.get("platform")]
+    if not entities and not templates:
+        raise ProfileError("Profile must define at least one entity or entity_template.")
 
-    if not real_entities and not real_templates:
-        raise ProfileError("Profile must define at least one entity or entity_template with a platform.")
+    # Validate flat entities
+    for ent in entities:
+        _validate_entity_def(ent, context="entities")
 
-    for ent in real_entities:
-        plat = ent.get("platform")
-        if plat not in VALID_PLATFORMS:
-            raise ProfileError(f"Entity {ent.get('name')!r} has unsupported platform: {plat!r}")
+    # FIX: also validate entity_templates before expansion
+    for tmpl in templates:
+        _validate_entity_def(tmpl, context="entity_templates")
+
+
+def _validate_entity_def(ent: dict, context: str = "") -> None:
+    """Validate a single entity or template definition."""
+    name = ent.get("name", "<unnamed>")
+    plat = ent.get("platform")
+    if plat not in VALID_PLATFORMS:
+        raise ProfileError(
+            f"[{context}] Entity {name!r} has unsupported platform: {plat!r}. "
+            f"Valid: {VALID_PLATFORMS}"
+        )
+    if not ent.get("osc_address"):
+        raise ProfileError(f"[{context}] Entity {name!r} is missing 'osc_address'.")
+
+    # FIX: validate osc_arg_template if present
+    tmpl_val = ent.get("osc_arg_template")
+    if tmpl_val is not None and tmpl_val not in VALID_OSC_ARG_TEMPLATES:
+        raise ProfileError(
+            f"[{context}] Entity {name!r} has unknown osc_arg_template: {tmpl_val!r}. "
+            f"Valid: {VALID_OSC_ARG_TEMPLATES}"
+        )
 
 
 def _expand_entities(profile: dict) -> dict:
     """Expand entity_templates with range: into flat entity list."""
     profile = deepcopy(profile)
-
-    # Skip comment-only entries (no platform key)
-    expanded: list[dict] = [e for e in profile.get("entities", []) if e.get("platform")]
+    expanded: list[dict] = list(profile.get("entities", []))
 
     for tmpl in profile.get("entity_templates", []):
-        if not tmpl.get("platform"):
-            continue  # comment entry
-
         range_cfg = tmpl.get("range")
         if not range_cfg:
-            expanded.append(_substitute(tmpl, 1, var=None, pad=0))
+            expanded.append(_substitute(tmpl, 1))
             continue
 
-        # Support both our schema (from/to) and generated code (start/end)
-        start = range_cfg.get("from", range_cfg.get("start", 1))
-        end = range_cfg.get("to", range_cfg.get("end", start))
+        start = range_cfg.get("start", 1)
+        end = range_cfg.get("end", start)
         pad = range_cfg.get("pad", 0)
-        var = range_cfg.get("var")  # named variable e.g. "ch", "n"
 
-        for i in range(start, end + 1):
-            entity = _substitute(tmpl, i, var=var, pad=pad)
+        for n in range(start, end + 1):
+            entity = _substitute(tmpl, n, ch=n, pad=pad)
             entity.pop("range", None)
             expanded.append(entity)
 
@@ -109,30 +123,21 @@ def _expand_entities(profile: dict) -> dict:
     return profile
 
 
-def _substitute(template: dict, n: int, var: str | None, pad: int) -> dict:
-    """Recursively substitute {n}, {ch}, and named {var} placeholders."""
+def _substitute(template: dict, n: int, ch: int | None = None, pad: int = 0) -> dict:
+    """Recursively substitute {n}, {ch} placeholders."""
+    if ch is None:
+        ch = n
+
     n_str = str(n).zfill(pad) if pad else str(n)
+    ch_str = str(ch).zfill(pad) if pad else str(ch)
 
     def _sub(value: Any) -> Any:
         if isinstance(value, str):
-            value = value.replace("{n}", n_str).replace("{ch}", n_str)
-            if var:
-                value = value.replace(f"{{{var}}}", n_str)
-            return value
+            return value.replace("{n}", n_str).replace("{ch}", ch_str)
         if isinstance(value, dict):
             return {k: _sub(v) for k, v in value.items()}
         if isinstance(value, list):
-            return [_sub(item) for item in value]
+            return [_sub(i) for i in value]
         return value
 
     return _sub(deepcopy(template))
-
-
-def normalize_entity(entity: dict) -> dict:
-    """Alias osc_path -> osc_address and feedback_path -> feedback_address."""
-    entity = dict(entity)
-    if "osc_path" in entity and "osc_address" not in entity:
-        entity["osc_address"] = entity.pop("osc_path")
-    if "feedback_path" in entity and "feedback_address" not in entity:
-        entity["feedback_address"] = entity.pop("feedback_path")
-    return entity

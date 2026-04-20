@@ -1,7 +1,7 @@
 {
-  "name": "OSC Control",
-  "description": "Home Assistant integration for OSC-based show control (QLC+, Behringer X32, and more)",
+  "name": "Show Control (OSC)",
+  "content_in_root": false,
   "render_readme": true,
   "homeassistant": "2024.1.0",
-  "domains": ["number", "switch", "button", "select"]
+  "filename": "ha-showcontrol-v1.zip"
 }

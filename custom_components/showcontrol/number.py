@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
+from homeassistant.components.number import NumberMode, RestoreNumber
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -51,20 +51,17 @@ class ShowControlNumber(RestoreNumber):
         name = config.get("name", "number")
         self._attr_name = config.get("friendly_name", name)
         self._attr_unique_id = f"{entry.entry_id}_{name}"
-        self._attr_native_min_value = float(config.get("min", 0.0))
-        self._attr_native_max_value = float(config.get("max", 1.0))
-        self._attr_native_step = float(config.get("step", 0.01))
+        self._attr_native_min_value = config.get("min", 0.0)
+        self._attr_native_max_value = config.get("max", 1.0)
+        self._attr_native_step = config.get("step", 0.01)
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_unit_of_measurement = config.get("unit")
         self._osc_address = config.get("osc_address", "")
         self._port_override = config.get("port")
-        self._attr_native_value: float = float(config.get("default", self._attr_native_min_value))
+        # FIX: explicit set of valid templates, "float" is now a named value
+        self._osc_arg_template: str = config.get("osc_arg_template", "float")
+        self._attr_native_value: float = config.get("default", self._attr_native_min_value)
         self._attr_icon = config.get("icon")
-
-        # Determine value type: profile field "value_type" takes priority,
-        # then legacy "osc_arg_template", then default float.
-        vtype = config.get("value_type") or config.get("osc_arg_template", "float")
-        self._value_type = vtype  # "int", "float", "scaled_255"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -84,8 +81,7 @@ class ShowControlNumber(RestoreNumber):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         if (last := await self.async_get_last_number_data()) is not None:
-            if last.native_value is not None:
-                self._attr_native_value = float(last.native_value)
+            self._attr_native_value = last.native_value or self._attr_native_min_value
 
         cached = self._coordinator.get_cached_state(self._attr_unique_id)
         if cached is not None:
@@ -109,15 +105,15 @@ class ShowControlNumber(RestoreNumber):
     async def async_set_native_value(self, value: float) -> None:
         self._attr_native_value = value
         self._coordinator.set_cached_state(self._attr_unique_id, value)
-        args = self._build_args(value)
-        await self._coordinator.async_send(self._osc_address, args, port=self._port_override)
+        await self._coordinator.async_send(
+            self._osc_address, self._build_args(value), port=self._port_override
+        )
         self.async_write_ha_state()
 
     def _build_args(self, value: float) -> list[Any]:
-        vtype = self._value_type
-        if vtype == "int":
-            return [int(round(value))]
-        if vtype == "scaled_255":
-            return [int(round(value * 255))]
-        # default: float
-        return [float(value)]
+        # FIX: all three templates explicit, "float" is no longer a fallback accident
+        if self._osc_arg_template == "int":
+            return [int(value)]
+        if self._osc_arg_template == "scaled_255":
+            return [int(value * 255)]
+        return [float(value)]  # "float" (default)

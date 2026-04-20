@@ -10,6 +10,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .const import DOMAIN, PLATFORMS, COORDINATOR, PROFILE_DATA, CONF_PROFILE_CONTENT
 from .coordinator import ShowControlCoordinator
 from .profile_loader import load_profile, ProfileError
+from .services import async_register_services, async_unregister_services
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,8 +45,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Register services (idempotent — only registers once)
+    await async_register_services(hass)
+
+    # Register OptionsFlow
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
     _LOGGER.info("Show Control integration set up: %s", profile.get("name"))
     return True
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload entry when options are updated."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -57,5 +70,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator: ShowControlCoordinator = entry_data.get(COORDINATOR)
         if coordinator:
             await coordinator.async_teardown()
+
+        # Unregister services only when last entry is removed
+        await async_unregister_services(hass)
 
     return unload_ok
