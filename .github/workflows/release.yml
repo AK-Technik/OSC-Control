@@ -3,7 +3,10 @@ name: Release
 on:
   push:
     tags:
-      - "v*.*.*"   # Wird ausgelöst wenn du z.B. v1.0.1 pushst
+      - "v*.*.*"
+
+permissions:
+  contents: write  # FIX: Actions braucht explizit Schreibrecht
 
 jobs:
   release:
@@ -12,20 +15,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Update manifest.json version
-        run: |
-          sed -i 's/"version": ".*"/"version": "${{ steps.version.outputs.VERSION }}"/' \
-            custom_components/showcontrol/manifest.json
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add custom_components/showcontrol/manifest.json
-          git diff --staged --quiet || git commit -m "chore: bump version to ${{ steps.version.outputs.VERSION }}"
-          git push origin HEAD:main
 
       - name: Build ZIP
         run: |
@@ -38,12 +33,16 @@ jobs:
         with:
           name: "v${{ steps.version.outputs.VERSION }}"
           body: |
+            ## Was ist neu
+            
+            Siehe [CHANGELOG.md](https://github.com/AK-Technik/OSC-Control/blob/main/CHANGELOG.md) für Details.
+            
             ## Installation
             
-            **HACS**: Integration wird automatisch als Update angeboten.
+            **HACS**: Update wird automatisch angeboten.
             
-            **Manuell**: ZIP herunterladen, `custom_components/showcontrol/` 
-            nach `<HA config>/custom_components/showcontrol/` kopieren, HA neu starten.
+            **Manuell**: ZIP herunterladen → `custom_components/showcontrol/` 
+            nach `<HA config>/custom_components/showcontrol/` kopieren → HA neu starten.
           files: ha-showcontrol-${{ steps.version.outputs.VERSION }}.zip
           draft: false
           prerelease: false
