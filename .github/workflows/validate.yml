@@ -1,0 +1,66 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate Integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install python-osc homeassistant --quiet
+
+      - name: Syntax check
+        run: |
+          echo "▶ Python syntax check..."
+          find custom_components/showcontrol -name "*.py" \
+            -exec python3 -m py_compile {} \; -print
+
+      - name: Validate profiles
+        run: |
+          echo "▶ Profile validation..."
+          python3 - << 'PYEOF'
+          import sys, os
+          sys.path.insert(0, 'custom_components/showcontrol')
+          from profile_loader import load_profile
+          profiles_dir = 'custom_components/showcontrol/profiles'
+          errors = []
+          for fname in sorted(os.listdir(profiles_dir)):
+              if not fname.endswith('.json'):
+                  continue
+              try:
+                  p = load_profile(os.path.join(profiles_dir, fname))
+                  print(f"✓ {p['name']} ({len(p['entities'])} entities)")
+              except Exception as e:
+                  errors.append(f"✗ {fname}: {e}")
+                  print(f"✗ {fname}: {e}")
+          if errors:
+              sys.exit(1)
+          PYEOF
+
+      - name: Check manifest.json
+        run: |
+          echo "▶ Manifest check..."
+          python3 -c "
+          import json
+          with open('custom_components/showcontrol/manifest.json') as f:
+              m = json.load(f)
+          required = ['domain','name','version','iot_class','config_flow']
+          missing = [k for k in required if k not in m]
+          if missing:
+              print(f'Missing keys: {missing}')
+              exit(1)
+          print(f'✓ manifest.json OK — version {m[\"version\"]}')
+          "
