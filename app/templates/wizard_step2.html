@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Verbindung — Gerät hinzufügen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Gerät hinzufügen</h1>
+</div>
+
+<div class="wizard-steps">
+  <div class="wizard-step done">1 Typ</div>
+  <div class="wizard-step-sep">›</div>
+  <div class="wizard-step active">2 Verbindung</div>
+  <div class="wizard-step-sep">›</div>
+  <div class="wizard-step">3 Profil</div>
+</div>
+
+<div class="wizard-type-badge badge-{{ device_type }}">{{ device_type | upper }}</div>
+
+{% set device_hints = {
+  'x32': 'Keepalive: /xremote alle 8s wird automatisch gesendet.',
+  'm32': 'Keepalive: /xremote alle 8s wird automatisch gesendet.',
+  'wing': 'Wing OSC: Firmware 1.15+ empfohlen.',
+  'xr18': 'X-Air: Keepalive /-action/setactive wird automatisch gesendet.',
+  'xr16': 'X-Air: Keepalive /-action/setactive wird automatisch gesendet.',
+  'xr12': 'X-Air: Keepalive /-action/setactive wird automatisch gesendet.',
+  'xr8':  'X-Air: Keepalive /-action/setactive wird automatisch gesendet.',
+} %}
+{% if device_type in device_hints %}
+<div class="info-hint">ℹ {{ device_hints[device_type] }}</div>
+{% endif %}
+
+<div class="form-card">
+  <div class="form-group">
+    <label class="form-label">Name des Geräts</label>
+    <input id="f-name" class="form-input" type="text" placeholder="z.B. QLC+ Hauptbühne" autocomplete="off">
+  </div>
+
+  <div class="form-row">
+    <div class="form-group flex-3">
+      <label class="form-label">IP-Adresse</label>
+      <input id="f-ip" class="form-input mono" type="text" placeholder="192.168.1.100" autocomplete="off">
+    </div>
+    <div class="form-group flex-1">
+      <label class="form-label">Port</label>
+      <input id="f-port" class="form-input mono" type="number" value="{{ default_ports[device_type] if device_type in default_ports else 7700 }}" min="1" max="65535">
+    </div>
+  </div>
+
+  <button class="btn btn-secondary btn-full" id="btn-test" onclick="testConn()">
+    ⚡ Verbindung testen
+  </button>
+  <div id="test-result" class="test-result" style="margin-top:0.75rem;display:none"></div>
+</div>
+
+<div class="wizard-nav">
+  <a href="/add" class="btn btn-secondary">← Zurück</a>
+  <button class="btn btn-primary" id="btn-next" onclick="goNext()" disabled>
+    Weiter →
+  </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const deviceType = '{{ device_type }}';
+
+// Sinnvolle Standard-Ports
+const defaultPorts = {
+  qlcplus: 7700,
+  x32: 10023,
+  m32: 10023,
+  wing: 2244,
+  xr18: 10024,
+  xr16: 10024,
+  xr12: 10024,
+  xr8: 10024,
+  generic: 8000,
+};
+document.getElementById('f-port').value = defaultPorts[deviceType] || 8000;
+
+async function testConn() {
+  const ip = document.getElementById('f-ip').value.trim();
+  const port = document.getElementById('f-port').value;
+  const btn = document.getElementById('btn-test');
+  const res = document.getElementById('test-result');
+
+  if (!ip) { showToast('Bitte IP eingeben', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Teste...';
+  res.style.display = 'none';
+
+  const r = await fetch('/api/test-connection', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ip, port: parseInt(port)}),
+  });
+  const d = await r.json();
+
+  res.textContent = d.message;
+  res.className = `test-result ${d.ok ? 'ok' : 'error'}`;
+  res.style.display = 'block';
+
+  document.getElementById('btn-next').disabled = !d.ok;
+
+  btn.disabled = false;
+  btn.textContent = '⚡ Verbindung testen';
+}
+
+function goNext() {
+  const name = document.getElementById('f-name').value.trim() || deviceType;
+  const ip = document.getElementById('f-ip').value.trim();
+  const port = document.getElementById('f-port').value;
+  window.location = `/add/step3?type=${deviceType}&ip=${encodeURIComponent(ip)}&port=${port}&name=${encodeURIComponent(name)}`;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Show Control Device",
+        "description": "Enter the hostname/IP and OSC port of your device.",
+        "data": {
+          "host": "Host / IP Address",
+          "port": "OSC Port"
+        }
+      },
+      "profile": {
+        "title": "Select Profile",
+        "description": "Choose a device profile or upload your own JSON. {upload_hint}",
+        "data": {
+          "profile_choice": "Profile",
+          "profile_upload": "Profile JSON (paste here if uploading)"
+        }
+      },
+      "test": {
+        "title": "Connection Test",
+        "description": "Testing connection to {host}:{port}…",
+        "data": {}
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach device. Check host/port and try again.",
+      "profile_invalid": "Profile JSON is invalid. Check the format and try again.",
+      "profile_not_found": "Selected profile not found.",
+      "profile_upload_empty": "Please paste the profile JSON content."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "name": "Behringer Wing",
+  "description": "Behringer Wing — 48 CH, 8 Aux, 24 Bus/Aux Mix, 8 Matrix, 16 DCA, 8 FX. OSC port 2223.",
+
+  "device": {
+    "name": "Behringer Wing",
+    "manufacturer": "Behringer",
+    "model": "Wing",
+    "sw_version": "1.x"
+  },
+
+  "transport": {
+    "type": "osc_udp",
+    "port": 2223,
+    "feedback_port": 2224,
+    "source_port": 0
+  },
+
+  "ping": { "address": "/ping", "args": [] },
+  "keepalive": { "address": "/xremote", "args": [], "interval": 8 },
+  "workarounds": ["skip_ping"],
+
+  "_note": "Wing OSC uses same /ch/ /bus/ /dca/ /mtx/ path structure as X32 but different port (2223) and extended channel counts. Verify paths against Wing firmware OSC reference.",
+
+  "entities": [
+    {
+      "platform": "number", "name": "main_lr_fader", "friendly_name": "Main LR Fader",
+      "osc_address": "/main/st/mix/fader", "feedback_address": "/main/st/mix/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.75, "osc_arg_template": "float",
+      "icon": "mdi:volume-high"
+    },
+    {
+      "platform": "switch", "name": "main_lr_mute", "friendly_name": "Main LR Mute",
+      "osc_address": "/main/st/mix/on", "feedback_address": "/main/st/mix/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:volume-off"
+    },
+    {
+      "platform": "number", "name": "mono_fader", "friendly_name": "Mono/Center Fader",
+      "osc_address": "/main/m/mix/fader", "feedback_address": "/main/m/mix/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "osc_arg_template": "float",
+      "icon": "mdi:volume-medium"
+    },
+    {
+      "platform": "switch", "name": "mono_mute", "friendly_name": "Mono/Center Mute",
+      "osc_address": "/main/m/mix/on", "feedback_address": "/main/m/mix/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:volume-off"
+    }
+  ],
+
+  "entity_templates": [
+    {
+      "platform": "number", "name": "ch{n}_fader", "friendly_name": "CH {n} Fader",
+      "osc_address": "/ch/{n}/mix/fader", "feedback_address": "/ch/{n}/mix/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.75, "osc_arg_template": "float",
+      "icon": "mdi:tune-vertical",
+      "range": { "start": 1, "end": 48, "pad": 2 }
+    },
+    {
+      "platform": "switch", "name": "ch{n}_mute", "friendly_name": "CH {n} Mute",
+      "osc_address": "/ch/{n}/mix/on", "feedback_address": "/ch/{n}/mix/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:microphone-off",
+      "range": { "start": 1, "end": 48, "pad": 2 }
+    },
+    {
+      "platform": "number", "name": "fxrtn{n}_fader", "friendly_name": "FX Return {n} Fader",
+      "osc_address": "/fxrtn/{n}/mix/fader", "feedback_address": "/fxrtn/{n}/mix/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.75, "osc_arg_template": "float",
+      "icon": "mdi:sine-wave",
+      "range": { "start": 1, "end": 8, "pad": 2 }
+    },
+    {
+      "platform": "switch", "name": "fxrtn{n}_mute", "friendly_name": "FX Return {n} Mute",
+      "osc_address": "/fxrtn/{n}/mix/on", "feedback_address": "/fxrtn/{n}/mix/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:volume-off",
+      "range": { "start": 1, "end": 8, "pad": 2 }
+    },
+    {
+      "platform": "number", "name": "bus{n}_fader", "friendly_name": "Bus {n} Fader",
+      "osc_address": "/bus/{n}/mix/fader", "feedback_address": "/bus/{n}/mix/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.75, "osc_arg_template": "float",
+      "icon": "mdi:audio-input-rca",
+      "range": { "start": 1, "end": 24, "pad": 2 }
+    },
+    {
+      "platform": "switch", "name": "bus{n}_mute", "friendly_name": "Bus {n} Mute",
+      "osc_address": "/bus/{n}/mix/on", "feedback_address": "/bus/{n}/mix/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:volume-off",
+      "range": { "start": 1, "end": 24, "pad": 2 }
+    },
+    {
+      "platform": "number", "name": "mtx{n}_fader", "friendly_name": "Matrix {n} Fader",
+      "osc_address": "/mtx/{n}/mix/fader", "feedback_address": "/mtx/{n}/mix/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.75, "osc_arg_template": "float",
+      "icon": "mdi:matrix",
+      "range": { "start": 1, "end": 8, "pad": 2 }
+    },
+    {
+      "platform": "switch", "name": "mtx{n}_mute", "friendly_name": "Matrix {n} Mute",
+      "osc_address": "/mtx/{n}/mix/on", "feedback_address": "/mtx/{n}/mix/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:volume-off",
+      "range": { "start": 1, "end": 8, "pad": 2 }
+    },
+    {
+      "platform": "number", "name": "dca{n}_fader", "friendly_name": "DCA {n} Fader",
+      "osc_address": "/dca/{n}/fader", "feedback_address": "/dca/{n}/fader",
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.75, "osc_arg_template": "float",
+      "icon": "mdi:group",
+      "range": { "start": 1, "end": 16 }
+    },
+    {
+      "platform": "switch", "name": "dca{n}_mute", "friendly_name": "DCA {n} Mute",
+      "osc_address": "/dca/{n}/on", "feedback_address": "/dca/{n}/on",
+      "bool_inverted": true, "on_args": [0], "off_args": [1], "icon": "mdi:volume-off",
+      "range": { "start": 1, "end": 16 }
+    }
+  ]
+}

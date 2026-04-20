@@ -1,0 +1,81 @@
+{
+  "name": "QLC+ Generic",
+  "description": "Generic QLC+ profile. Adjust OSC paths to match your Virtual Console button/fader assignments.",
+
+  "device": {
+    "name": "QLC+",
+    "manufacturer": "QLC+ Project",
+    "model": "QLC+ OSC",
+    "sw_version": "5.x"
+  },
+
+  "transport": {
+    "type": "osc_udp",
+    "port": 7700,
+    "feedback_port": 7701,
+    "source_port": 0
+  },
+
+  "ping": {
+    "address": "/qlc/ping",
+    "args": [],
+    "_comment": "QLC+ ignores unknown OSC messages; skip_ping workaround is set below"
+  },
+
+  "workarounds": [
+    "skip_ping",
+    "no_keepalive_check"
+  ],
+
+  "_comment_paths": [
+    "OSC paths below map to QLC+ Virtual Console widgets.",
+    "In QLC+: Settings → Input/Output → OSC, enable input/output.",
+    "Each Virtual Console button/fader needs an OSC input path assigned.",
+    "Adjust /qlc/scene/{n}, /qlc/master, etc. to match YOUR Virtual Console setup."
+  ],
+
+  "entities": [
+    {
+      "platform": "number",
+      "name": "master_dim",
+      "friendly_name": "Master Dimmer",
+      "osc_address": "/qlc/master",
+      "feedback_address": "/qlc/master",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 1.0,
+      "osc_arg_template": "float",
+      "_comment": "Path: QLC+ Virtual Console Fader → OSC input path = /qlc/master"
+    },
+    {
+      "platform": "number",
+      "name": "group_1_dim",
+      "friendly_name": "Group 1 Dimmer",
+      "osc_address": "/qlc/group/1/dim",
+      "feedback_address": "/qlc/group/1/dim",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 1.0,
+      "osc_arg_template": "float",
+      "_comment": "Path: QLC+ Virtual Console Fader → OSC input path = /qlc/group/1/dim"
+    }
+  ],
+
+  "entity_templates": [
+    {
+      "platform": "button",
+      "name": "scene_{n}",
+      "friendly_name": "Scene {n}",
+      "osc_address": "/qlc/scene/{n}",
+      "osc_args": [1],
+      "icon": "mdi:lightbulb-on",
+      "_comment": "Adjust /qlc/scene/{n} to match QLC+ VC button OSC paths. 4 buttons: scene_1..scene_4.",
+      "range": {
+        "start": 1,
+        "end": 4
+      }
+    }
+  ]
+}

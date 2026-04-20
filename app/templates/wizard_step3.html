@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Profil — Gerät hinzufügen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Gerät hinzufügen</h1>
+</div>
+
+<div class="wizard-steps">
+  <div class="wizard-step done">1 Typ</div>
+  <div class="wizard-step-sep">›</div>
+  <div class="wizard-step done">2 Verbindung</div>
+  <div class="wizard-step-sep">›</div>
+  <div class="wizard-step active">3 Profil</div>
+</div>
+
+<p class="wizard-subtitle">Wähle ein Startprofil für <strong>{{ name }}</strong></p>
+
+<div class="profile-options">
+
+  <button class="profile-option" onclick="selectProfile(null)">
+    <div class="po-icon">○</div>
+    <div class="po-text">
+      <strong>Leer starten</strong>
+      <span>Entities selbst anlegen</span>
+    </div>
+  </button>
+
+  {% for p in library %}
+  {% if p.device_type == device_type or p.device_type == 'generic' %}
+  <button class="profile-option" onclick="selectProfile('{{ p.filename }}')">
+    <div class="po-icon">◉</div>
+    <div class="po-text">
+      <strong>{{ p.name }}</strong>
+      <span>{{ p.entity_count }} Entities · Bibliothek</span>
+    </div>
+  </button>
+  {% endif %}
+  {% endfor %}
+
+</div>
+
+<div id="saving" class="saving-overlay hidden">
+  <div class="saving-box">
+    <div class="spinner"></div>
+    <span>Gerät wird angelegt…</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const deviceType = '{{ device_type }}';
+const ip = '{{ ip }}';
+const port = '{{ port }}';
+const name = '{{ name }}';
+
+async function selectProfile(filename) {
+  document.getElementById('saving').classList.remove('hidden');
+  const r = await fetch('/api/add-device', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      name, device_type: deviceType, ip, port: parseInt(port),
+      library_profile: filename,
+    }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    window.location = `/device/${d.device_id}/profile`;
+  } else {
+    document.getElementById('saving').classList.add('hidden');
+    showToast('Fehler beim Anlegen', 'error');
+  }
+}
+</script>
+{% endblock %}
