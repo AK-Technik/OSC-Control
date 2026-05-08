@@ -120,16 +120,23 @@ def reload_ha_integration():
         return False, str(e)
 
 def test_connection(ip, port, device_type="generic"):
-    """Testet ob ein Gerät erreichbar ist (TCP-Ping)."""
+    """Testet ob ein OSC-Gerät erreichbar ist (UDP-Probe via /info)."""
     try:
         port = int(port)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(3)
-        result = sock.connect_ex((ip, port))
-        sock.close()
-        if result == 0:
-            return True, f"Verbunden mit {ip}:{port}"
-        return False, f"Port {port} nicht erreichbar ({ip})"
+        # OSC /info packet: address "/info" + null-pad + typetag ","
+        msg = b"/info\x00\x00\x00,\x00\x00\x00"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(2)
+        try:
+            sock.sendto(msg, (ip, port))
+            data, _ = sock.recvfrom(2048)
+            if data:
+                return True, f"OSC-Antwort von {ip}:{port} ({len(data)} bytes)"
+            return False, f"Keine OSC-Antwort von {ip}:{port}"
+        except socket.timeout:
+            return False, f"Timeout: {ip}:{port} antwortet nicht auf OSC"
+        finally:
+            sock.close()
     except Exception as e:
         return False, str(e)
 
