@@ -12,7 +12,7 @@
   "transport": {
     "type": "osc_udp",
     "port": 10023,
-    "feedback_port": 10024,
+    "feedback_port": 10023,
     "source_port": 0
   },
 
