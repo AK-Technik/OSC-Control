@@ -3,10 +3,6 @@ FROM $BUILD_FROM
 
 # Cache-Bust: 2026-05-08-1
 ENV LANG C.UTF-8
-...ARG BUILD_FROM
-FROM $BUILD_FROM
-
-ENV LANG C.UTF-8
 
 RUN apk add --no-cache python3 py3-pip
 
