@@ -150,12 +150,35 @@ class ShowControlCoordinator(DataUpdateCoordinator):
     # ------------------------------------------------------------------
 
     def _build_feedback_map(self) -> None:
-        """Build address → unique_id map for feedback routing."""
+        """Build address → unique_id map for feedback routing.
+        
+        Includes both fixed entities and template-expanded entities.
+        """
+        # Fixed entities
         for entity in self.profile.get("entities", []):
             fb_addr = entity.get("feedback_address") or entity.get("osc_address")
             if fb_addr:
                 uid = self._entity_unique_id(entity)
                 self._feedback_map[fb_addr] = uid
+
+        # Template-expanded entities
+        for tpl in self.profile.get("entity_templates", []):
+            rng = tpl.get("range", {})
+            start = rng.get("start", 1)
+            end = rng.get("end", 1)
+            pad = rng.get("pad", 0)
+            for i in range(start, end + 1):
+                n_str = str(i).zfill(pad) if pad else str(i)
+                expanded = {
+                    "name": tpl["name"].replace("{n}", n_str),
+                    "osc_address": tpl["osc_address"].replace("{n}", n_str),
+                    "feedback_address": tpl.get("feedback_address", tpl["osc_address"]).replace("{n}", n_str),
+                }
+                fb_addr = expanded["feedback_address"] or expanded["osc_address"]
+                uid = self._entity_unique_id(expanded)
+                self._feedback_map[fb_addr] = uid
+
+        _LOGGER.info("Feedback map built with %d entries", len(self._feedback_map))
 
     def _entity_unique_id(self, entity: dict) -> str:
         return f"{self._entry.entry_id}_{entity.get('name', 'unknown')}"
