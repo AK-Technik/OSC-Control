@@ -202,13 +202,18 @@ def empty_profile_template(device_id, device_name, device_type):
     }
 
 def get_device_status(device):
-    """Schneller Online-Check."""
+    """Schneller OSC-Online-Check via UDP /info."""
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(1)
-        result = sock.connect_ex((device["ip"], int(device["port"])))
-        sock.close()
-        return "online" if result == 0 else "offline"
+        try:
+            sock.sendto(b"/info\x00\x00\x00,\x00\x00\x00", (device["ip"], int(device["port"])))
+            data, _ = sock.recvfrom(2048)
+            return "online" if data else "offline"
+        except socket.timeout:
+            return "offline"
+        finally:
+            sock.close()
     except Exception:
         return "offline"
 
